@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="id"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Simulasi 3D Gunung Api – Kelompok 4</title>
+<style>
+:root{--bg:#f6f3ee;--fg:#1f2328;--card:#fff;--ac:#d9480f;--mu:#6b7280;--bd:#e3ddd3;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#17181b;--fg:#ece8e1;--card:#222428;--ac:#ff8a4c;--mu:#9aa0a8;--bd:#33363b}}
+:root[data-theme="dark"]{--bg:#17181b;--fg:#ece8e1;--card:#222428;--ac:#ff8a4c;--mu:#9aa0a8;--bd:#33363b}
+*{box-sizing:border-box}html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column}
+#stage{touch-action:none;position:relative;flex:0 0 46%;min-height:240px;background:linear-gradient(#8fb8e0,#dfeaf3);overflow:hidden}
+#stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:none}
+#stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+#hint{position:absolute;left:8px;bottom:6px;font-size:12px;color:#fff;background:#0006;padding:2px 8px;border-radius:10px}
+#ar{position:absolute;right:8px;top:8px;border:0;border-radius:16px;padding:6px 12px;background:#000a;color:#fff;font-size:13px}
+#panel{flex:1;overflow-y:auto;padding:10px 14px 24px}
+#tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px}
+#tabs button{flex:0 0 auto;border:1px solid var(--bd);background:var(--card);color:var(--fg);border-radius:18px;padding:6px 14px;font-size:14px}
+#tabs button.on{background:var(--ac);color:#fff;border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px 14px;margin-top:8px}
+h2{font-size:16px;margin:0 0 6px}p{margin:6px 0}
+.ctl{display:flex;align-items:center;gap:10px;margin:6px 0;font-size:14px}.ctl input[type=range]{flex:1}
+.mu{color:var(--mu);font-size:13px}
+button.act{border:0;background:var(--ac);color:#fff;border-radius:8px;padding:7px 14px;font-size:14px}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{border-bottom:1px solid var(--bd);padding:5px 4px;text-align:left;vertical-align:top}
+.lg span{display:inline-block;margin-right:12px;font-size:13px}
+</style></head><body>
+<div id="stage">
+<video id="vid" playsinline muted></video>
+<button id="ar">📷 Mode kamera (AR)</button>
+<button id="openMV" style="position:absolute;right:8px;top:48px;z-index:3;border:0;border-radius:16px;padding:6px 12px;background:#d9480f;color:#fff;font-size:13px">🧊 3D / WebXR</button>
+<div id="mvWrap" style="display:none;position:absolute;inset:0;z-index:5;background:#f6f3ee">
+  <button id="closeMV" style="position:absolute;right:10px;top:10px;z-index:8;border:0;border-radius:18px;padding:8px 13px;background:#222;color:#fff">✕ Tutup</button>
+  <model-viewer id="volcanoMV" style="width:100%;height:100%;background:linear-gradient(#8fb8e0,#dfeaf3)"
+    camera-controls touch-action="pan-y" auto-rotate shadow-intensity="1"
+    ar ar-modes="webxr scene-viewer quick-look" ar-scale="auto"
+    alt="Model 3D simulasi gunung api">
+    <button slot="ar-button" style="position:absolute;left:50%;bottom:18px;transform:translateX(-50%);border:0;border-radius:22px;padding:11px 18px;background:#d9480f;color:white;font-weight:600">📷 Lihat di ruang nyata (AR)</button>
+  </model-viewer>
+  <button id="downloadGLB" style="position:absolute;left:10px;top:10px;z-index:8;border:0;border-radius:18px;padding:8px 13px;background:#fff;color:#222">⬇ Simpan GLB</button>
+  <div id="mvStatus" style="position:absolute;left:10px;right:10px;bottom:8px;padding:7px 10px;border-radius:10px;background:#0009;color:white;font-size:12px;text-align:center;pointer-events:none">Menyiapkan model 3D…</div>
+</div><div id="go" style="display:none;position:fixed;inset:0;z-index:9;background:#000c;align-items:center;justify-content:center;flex-direction:column;color:#fff;text-align:center;padding:20px"><div style="font-size:20px;margin-bottom:6px">🌋 Simulasi Gunung Api</div><div style="margin-bottom:16px;opacity:.8">Izinkan kamera & sensor gerak saat diminta</div><button class="act" id="gob" style="font-size:18px;padding:12px 26px">▶ Mulai AR</button></div><div id="hint">Geser untuk memutar • cubit untuk zoom</div></div>
+<div id="panel">
+<div id="tabs"></div>
+<div class="card" id="qcard"></div>
+<div class="card">
+<div class="ctl"><label><input type="checkbox" id="cl" checked> Lava</label><label><input type="checkbox" id="ca" checked> Abu</label><label><input type="checkbox" id="cr" checked> Lembah sungai</label></div>
+<div class="ctl"><span style="width:92px">Kemiringan</span><input type="range" id="sk" min="0.5" max="1.5" step="0.05" value="1"><span id="vk" class="mu">1.0×</span></div>
+<div class="ctl"><span style="width:92px">Arah angin</span><input type="range" id="sa" min="0" max="359" step="1" value="90"><span id="va" class="mu" style="width:78px">ke Timur</span></div>
+<div class="ctl"><span style="width:92px">Kec. angin</span><input type="range" id="sw" min="0.4" max="1.6" step="0.05" value="1"><span id="vw" class="mu">1.0×</span></div>
+<div class="lg mu"><span>🟧 lava</span><span>⬜ abu</span><span>🟦 lembah sungai</span><span>🏠 Desa A (selatan, di lembah), B (timur), C (barat), D (utara)</span></div>
+</div>
+<details class="card"><summary><b>Tabel hasil pengamatan (contoh isian)</b></summary>
+<table><tr><th>Aspek</th><th>Hasil pengamatan</th></tr>
+<tr><td>Jenis material vulkanik</td><td>Lava pijar, abu vulkanik</td></tr>
+<tr><td>Bentuk bentang alam</td><td>Kerucut gunung api, kawah, lembah sungai, dataran lahar</td></tr>
+<tr><td>Arah pergerakan material</td><td>Lava: ke selatan mengikuti lembah. Abu: searah angin</td></tr>
+<tr><td>Kondisi medan yang memengaruhi</td><td>Kemiringan lereng, lembah, arah dan kecepatan angin</td></tr>
+<tr><td>Perubahan permukaan bumi</td><td>Lembah terisi dan dangkal, muncul timbunan material baru</td></tr></table></details>
+<p class="mu">Catatan: model ini disederhanakan untuk belajar, bukan data gunung api sungguhan.</p>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/4.1.0/model-viewer.min.js"></script>
+
+<script>
+window.onerror=(m,s,l)=>{document.getElementById('qcard').innerHTML='<b>Error:</b> '+m+' (baris '+l+')'};
+const S={k:1,f:0,a:90,w:1,q:1};
+const vx=z=>3*Math.sin(z*.14);
+const sm=z=>{const t=Math.min(1,Math.max(0,(z-2)/6));return t*t*(3-2*t)};
+function H(x,z){const r=Math.hypot(x,z),d=x-vx(z),s=sm(z);
+let h=2+S.k*14*Math.exp(-r/9)-S.k*3*Math.exp(-((r/1.6)**2));
+h-=2.2*Math.exp(-((d/1.7)**2))*s*(1-S.f);h+=S.f*1.3*Math.exp(-((d/2.8)**2))*s;
+return h+.25*Math.sin(x*.5)*Math.cos(z*.45)*Math.min(1,r/10)}
+const stage=document.getElementById('stage');
+const R=new THREE.WebGLRenderer({antialias:true,alpha:true});R.setPixelRatio(Math.min(devicePixelRatio,2));stage.appendChild(R.domElement);
+const sc=new THREE.Scene(),cam=new THREE.PerspectiveCamera(50,1,.1,300);cam.position.set(30,24,34);
+const ctl={target:new THREE.Vector3(0,5,6),update(){cam.lookAt(this.target)}};
+(function(){const el=R.domElement,P=new Map();el.style.touchAction='none';
+function orbit(dx,dy){const v=cam.position.clone().sub(ctl.target),r=v.length();let th=Math.atan2(v.x,v.z)+dx,ph=Math.acos(Math.min(1,Math.max(-1,v.y/r)))+dy;ph=Math.min(1.5,Math.max(.15,ph));cam.position.set(ctl.target.x+r*Math.sin(ph)*Math.sin(th),ctl.target.y+r*Math.cos(ph),ctl.target.z+r*Math.sin(ph)*Math.cos(th))}
+function zoom(f){const v=cam.position.clone().sub(ctl.target);cam.position.copy(ctl.target).add(v.setLength(Math.min(80,Math.max(10,v.length()*f))))}
+el.addEventListener('pointerdown',e=>{el.setPointerCapture(e.pointerId);P.set(e.pointerId,[e.clientX,e.clientY]);tw=null});
+el.addEventListener('pointerup',e=>P.delete(e.pointerId));el.addEventListener('pointercancel',e=>P.delete(e.pointerId));
+el.addEventListener('pointermove',e=>{if(!P.has(e.pointerId))return;const o=P.get(e.pointerId);
+if(P.size==1)orbit(-(e.clientX-o[0])*.008,-(e.clientY-o[1])*.008);
+else{const oid=[...P.keys()].find(i=>i!==e.pointerId),q=P.get(oid);zoom(Math.hypot(o[0]-q[0],o[1]-q[1])/Math.hypot(e.clientX-q[0],e.clientY-q[1]))}
+P.set(e.pointerId,[e.clientX,e.clientY])});
+el.addEventListener('wheel',e=>{e.preventDefault();zoom(1+e.deltaY*.001)},{passive:false})})();
+sc.add(new THREE.HemisphereLight(0xffffff,0x556655,.9));const dl=new THREE.DirectionalLight(0xffffff,.8);dl.position.set(20,40,10);sc.add(dl);
+const geo=new THREE.PlaneGeometry(60,60,90,90);geo.rotateX(-Math.PI/2);
+geo.setAttribute('color',new THREE.BufferAttribute(new Float32Array(geo.attributes.position.count*3),3));
+const terr=new THREE.Mesh(geo,new THREE.MeshLambertMaterial({vertexColors:true}));sc.add(terr);
+const riv=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0x2a8cff}));sc.add(riv);
+const houses=[[0,0],[18,0],[-18,0],[0,-18]].map((p,i)=>{if(i==0)p=[vx(20),20];const m=new THREE.Mesh(new THREE.BoxGeometry(1.6,1.4,1.6),new THREE.MeshLambertMaterial({color:0x3ca55c}));m.userData.p=p;sc.add(m);return m});
+function terrain(){const P=geo.attributes.position,C=geo.attributes.color;
+for(let i=0;i<P.count;i++){const y=H(P.getX(i),P.getZ(i));P.setY(i,y);
+const c=y>9?[.36,.35,.35]:y>5?[.46,.38,.3]:[.3,.5,.3];C.setXYZ(i,...c)}
+P.needsUpdate=C.needsUpdate=true;geo.computeVertexNormals();
+const pts=[];for(let z=2;z<=28;z+=.7)pts.push(new THREE.Vector3(vx(z),H(vx(z),z)+.15,z));riv.geometry.setFromPoints(pts);
+houses.forEach(m=>{const[x,z]=m.userData.p;m.position.set(x,H(x,z)+.7,z)})}
+terrain();
+const NL=80,lg=new THREE.BufferGeometry();lg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(NL*3),3));
+const lava=new THREE.Points(lg,new THREE.PointsMaterial({color:0xff5a14,size:.9}));lava.frustumCulled=false;sc.add(lava);
+const lo=Array.from({length:NL},()=>Math.random()-.5);
+const NA=420,ag=new THREE.BufferGeometry();ag.setAttribute('position',new THREE.BufferAttribute(new Float32Array(NA*3),3));
+const ash=new THREE.Points(ag,new THREE.PointsMaterial({color:0xdddddd,size:.8,transparent:true,opacity:.65}));ash.frustumCulled=false;sc.add(ash);
+const ap=Array.from({length:NA},()=>({p:Math.random(),a:Math.random()*6.28,r:Math.random()}));
+let arrow=null;function wind(){const a=S.a*Math.PI/180;return new THREE.Vector3(Math.sin(a),0,-Math.cos(a))}
+function setArrow(){if(arrow)sc.remove(arrow);arrow=new THREE.ArrowHelper(wind(),new THREE.Vector3(0,H(0,0)+8,0),12,0x3366ff,3,2);sc.add(arrow)}
+const names=['Utara','Timur Laut','Timur','Tenggara','Selatan','Barat Daya','Barat','Barat Laut'];
+const dn=['Desa A (selatan)','Desa B (timur)','Desa C (barat)','Desa D (utara)'],dv=[[0,1],[1,0],[-1,0],[0,-1]];
+function wtxt(){const w=wind(),ds=dv.map(v=>v[0]*w.x+v[1]*w.z),mx=ds.indexOf(Math.max(...ds));
+houses.forEach((m,i)=>m.material.color.set(ds[i]>.6?0xe8590c:0x3ca55c));
+return`Angin bertiup ke <b>${names[Math.round(S.a/45)%8]}</b>. Wilayah paling terdampak hujan abu: <b>${dn[mx]}</b> (rumah oranye). Desa yang berlawanan arah angin relatif aman.`}
+const Q={
+1:["Q1. Abu vulkanik vs aliran lava: beda gerak dan sebarannya?","<b>Lava</b> adalah cairan batuan pijar yang kental. Ia bergerak <b>menyusuri permukaan tanah</b> mengikuti gravitasi, lereng, dan lembah, relatif lambat, jangkauan terbatas (jalurnya sempit dan bisa ditebak dari peta kontur). <b>Abu</b> adalah butiran halus yang terlontar ke atmosfer, lalu <b>terbawa angin</b> dan jatuh di area luas, bisa jauh dari gunung, tidak peduli bentuk lembah. Jadi lava dikendalikan oleh <i>topografi</i>, abu dikendalikan oleh <i>angin</i>.",[1,1,1],[30,22,34]],
+2:["Q2. Kemiringan lereng dan arah gerak material","Material mengalir ke arah <b>kemiringan terbesar</b> (menuruni lereng, tegak lurus garis kontur). Lereng <b>curam</b>: lava dan lahar lebih cepat dan menjangkau lebih jauh. Lereng <b>landai</b>: melambat, melebar, dan menumpuk. <b>Coba geser slider Kemiringan</b>: lihat titik lava makin cepat saat lereng curam.",[1,0,0],[24,14,30]],
+3:["Q3. Mengapa lembah sungai jadi jalur lahar?","Lembah adalah <b>bagian terendah</b> yang berfungsi seperti talang: mengumpulkan air hujan dan mengalirkan material. Saat hujan, endapan vulkanik lepas bercampur air menjadi <b>lahar</b> yang mengalir cepat, terpandu dinding lembah, dan bisa sampai jauh dari kawah. Garis biru di model adalah jalur sungai; perhatikan lava mengikutinya.",[1,0,1],[8,12,32]],
+4:["Q4. Posisi wilayah terhadap arah angin","Wilayah <b>searah angin (downwind)</b> paling berpeluang tertimpa abu, makin dekat dan makin searah makin tebal. Wilayah <b>melawan arah angin (upwind)</b> relatif aman. Kecepatan angin dan tinggi kolom abu menentukan jauhnya sebaran. <b>Putar slider arah angin</b>.",[0,1,0],[28,28,28]],
+5:["Q5. Penumpukan material mengubah bentuk permukaan bumi","Lava, lahar, dan abu yang menumpuk <b>menimbun lembah</b>, membuatnya dangkal, membentuk dataran atau bukit baru, dan menggeser aliran sungai (bisa membendung dan membuat danau). Erupsi berulang juga membesarkan tubuh gunung. Tekan tombol untuk melihat lembah terisi. <p><button class='act' id='play'>▶ Mainkan penumpukan</button></p>",[1,1,1],[20,16,34]]};
+const tabs=document.getElementById('tabs'),qc=document.getElementById('qcard');let tw=null,t0=0,fa=false;
+function pick(n){S.q=n;[...tabs.children].forEach((b,i)=>b.classList.toggle('on',i+1==n));
+const q=Q[n];qc.innerHTML=`<h2>${q[0]}</h2><p>${q[1]}</p><p class="mu" id="wt"></p>`;
+cl.checked=!!q[2][0];ca.checked=!!q[2][1];cr.checked=!!q[2][2];tw=new THREE.Vector3(...q[3]);
+if(n==4)document.getElementById('wt').innerHTML=wtxt();
+if(n==5){S.f=0;terrain();document.getElementById('play').onclick=()=>{S.f=0;t0=performance.now();fa=true};t0=performance.now();fa=true}else{S.f=0;terrain()}}
+for(let i=1;i<=5;i++){const b=document.createElement('button');b.textContent='Pertanyaan '+i;b.onclick=()=>pick(i);tabs.appendChild(b)}
+const $=id=>document.getElementById(id);
+$('sk').oninput=e=>{S.k=+e.target.value;$('vk').textContent=S.k.toFixed(1)+'×';terrain();setArrow()};
+$('sa').oninput=e=>{S.a=+e.target.value;$('va').textContent='ke '+names[Math.round(S.a/45)%8];setArrow();if(S.q==4)$('wt').innerHTML=wtxt()};
+$('sw').oninput=e=>{S.w=+e.target.value;$('vw').textContent=S.w.toFixed(1)+'×'};
+let gy=false,a0=null,dev=null;const D=Math.PI/180,zee=new THREE.Vector3(0,0,1),eu=new THREE.Euler(),q0=new THREE.Quaternion(),q1=new THREE.Quaternion(-Math.sqrt(.5),0,0,Math.sqrt(.5));
+function setQ(q,al,be,ga,o){eu.set(be,al,-ga,'YXZ');q.setFromEuler(eu);q.multiply(q1);q.multiply(q0.setFromAxisAngle(zee,-o))}
+function onO(e){if(e.alpha==null)return;if(a0===null)a0=e.alpha;dev=[e.alpha-a0,e.beta,e.gamma]}
+$('ar').onclick=async()=>{const v=$('vid');
+if(gy){gy=false;removeEventListener('deviceorientation',onO);if(v.srcObject)v.srcObject.getTracks().forEach(t=>t.stop());v.style.display='none';stage.style.background='';stage.style.flexBasis='46%';$('ar').textContent='📷 Mode kamera (AR)';cam.position.set(30,24,34);return}
+try{v.srcObject=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});v.style.display='block';v.play();stage.style.background='none'}catch(e){$('hint').textContent='Kamera tidak diizinkan di sini, buka link di Chrome/Safari'}
+try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){if(await DeviceOrientationEvent.requestPermission()!=='granted')throw 0}
+a0=null;dev=null;addEventListener('deviceorientation',onO);gy=true;tw=null;stage.style.flexBasis='70%';cam.position.set(0,12,52);$('hint').textContent='Gerakkan HP: gunung tetap di tempatnya';$('ar').textContent='✕ Keluar AR'}catch(e){}};
+
+function size(){const w=stage.clientWidth,h=stage.clientHeight;R.setSize(w,h);cam.aspect=w/h;cam.updateProjectionMatrix()}
+new ResizeObserver(size).observe(stage);size();setArrow();
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const t=clock.getElapsedTime();
+if(fa){S.f=Math.min(1,(performance.now()-t0)/4000);terrain();if(S.f>=1)fa=false}
+if(tw&&!gy){cam.position.lerp(tw,.04);if(cam.position.distanceTo(tw)<.3)tw=null}
+const LP=lg.attributes.position,sp=.05*(.4+S.k);lava.visible=cl.checked;
+for(let i=0;i<NL;i++){const u=(t*sp+i/NL)%1,z=.5+u*25.5,x=vx(z)+lo[i]*(1.2+u*1.5);LP.setXYZ(i,x,H(x,z)+.35,z)}LP.needsUpdate=true;
+const AP=ag.attributes.position,w=wind(),hc=H(0,0),T=.85;ash.visible=ca.checked;riv.visible=cr.checked;
+for(let i=0;i<NA;i++){const o=ap[i],u=((t/9+o.p)%1)*T,b=(hc+24*T-.5)/(T*T),sp2=.4+u*4*o.r;
+AP.setXYZ(i,w.x*u*34*S.w+Math.cos(o.a)*sp2,hc+24*u-b*u*u,w.z*u*34*S.w+Math.sin(o.a)*sp2)}AP.needsUpdate=true;
+if(gy&&dev){setQ(cam.quaternion,dev[0]*D,dev[1]*D,dev[2]*D,(screen.orientation?screen.orientation.angle:0)*D)}else ctl.update();R.render(sc,cam)}
+const cl=$('cl'),ca=$('ca'),cr=$('cr');pick(1);loop();
+document.addEventListener('gesturestart',e=>e.preventDefault());
+
+// Google model-viewer: ekspor geometri simulasi menjadi GLB untuk 3D / WebXR.
+let volcanoBlobUrl = null;
+async function openModelViewer() {
+  const wrap = document.getElementById('mvWrap');
+  const status = document.getElementById('mvStatus');
+  const viewer = document.getElementById('volcanoMV');
+  wrap.style.display = 'block';
+  status.textContent = 'Membuat file GLB dari bentuk gunung api saat ini…';
+  try {
+    // Pakai build klasik yang memakai THREE global; kompatibel dengan file HTML lokal.
+    if (!THREE.GLTFExporter) throw new Error('GLTFExporter belum termuat. Periksa koneksi internet.');
+    const exporter = new THREE.GLTFExporter();
+
+    // Salin hanya objek statis yang relevan; partikel animasi tidak diekspor.
+    const exportScene = new THREE.Scene();
+    exportScene.background = new THREE.Color(0xdfeaf3);
+    const terrainMesh = terr.clone();
+    terrainMesh.geometry = terr.geometry.clone();
+    terrainMesh.material = new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 1, metalness: 0
+    });
+    exportScene.add(terrainMesh);
+
+    houses.forEach((house) => {
+      const h = house.clone();
+      h.geometry = house.geometry.clone();
+      h.material = new THREE.MeshStandardMaterial({
+        color: house.material.color.clone(), roughness: 1
+      });
+      exportScene.add(h);
+    });
+
+    const river = riv.clone();
+    river.geometry = riv.geometry.clone();
+    river.material = new THREE.LineBasicMaterial({ color: 0x2a8cff });
+    exportScene.add(river);
+
+    exportScene.add(new THREE.HemisphereLight(0xffffff, 0x667766, 1.4));
+    const sun = new THREE.DirectionalLight(0xffffff, 1.1);
+    sun.position.set(20, 40, 10);
+    exportScene.add(sun);
+
+    const glb = await new Promise((resolve, reject) => {
+      exporter.parse(exportScene, resolve, reject, { binary: true, onlyVisible: true });
+    });
+    const blob = new Blob([glb], { type: 'model/gltf-binary' });
+    if (volcanoBlobUrl) URL.revokeObjectURL(volcanoBlobUrl);
+    volcanoBlobUrl = URL.createObjectURL(blob);
+    viewer.src = volcanoBlobUrl;
+    status.textContent = 'Model siap. Putar / zoom, atau tekan tombol AR. Untuk WebXR, buka melalui HTTPS di browser yang mendukung AR.';
+    const download = document.getElementById('downloadGLB');
+    if (download) download.onclick = () => {
+      const a = document.createElement('a');
+      a.href = volcanoBlobUrl;
+      a.download = 'simulasi-gunung-api.glb';
+      a.click();
+    };
+  } catch (err) {
+    console.error(err);
+    status.textContent = 'Gagal membuat model. Periksa koneksi internet lalu coba lagi. (' + (err.message || err) + ')';
+  }
+}
+document.getElementById('openMV').addEventListener('click', openModelViewer);
+document.getElementById('closeMV').addEventListener('click', () => {
+  document.getElementById('mvWrap').style.display = 'none';
+});
+
+if(location.hash==='#ar'){$('go').style.display='flex';$('gob').onclick=()=>{$('go').style.display='none';$('ar').click()}}
+</script></body></html>
